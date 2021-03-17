@@ -1,44 +1,35 @@
-
 import asyncio
-import threading
 import sys
-
 from telethon.sync import TelegramClient, events
 
 api_id = '3961096'
 api_hash = '5c814390e26776fbe56919f7bff872cc'
 channelId = 'https://t.me/testgrp_pi'
 
-loop = asyncio.get_event_loop()
+class CLITelegram(TelegramClient):
+    def __init__(self, session_user_id, api_id, api_hash, on_message):
+        super().__init__(session_user_id, api_id, api_hash)
+        self.on_message = on_message
+        self.start()
 
-client = TelegramClient('my_listener', api_id, api_hash)
-client.start()
+    async def message_handler(self, event):
+        self.on_message(event.text)
 
-async def async_input(prompt):
-    """
-    Python's ``input()`` is blocking, which means the event loop we set
-    above can't be running while we're blocking there. This method will
-    let the loop run while we wait for input.
-    """
-    print(prompt, end='', flush=True)
-    return (await loop.run_in_executor(None, sys.stdin.readline)).rstrip()
+    async def run(self):
+        self.add_event_handler(self.message_handler, events.NewMessage)
 
-async def main():
+        while True:
+            # msg = await async_input('Enter a message: ')
+            msg = (await loop.run_in_executor(None, sys.stdin.readline)).rstrip()
+            if msg != "":
+                await self.send_message(channelId, msg)
 
-    print('Running Telegram Listener...')
+        self.run_until_disconnected()
 
-    @client.on(events.NewMessage(chats=channelId))
-    async def handler(event):
-        message = event.text
-        print(message)
-
-    while True:
-        # msg = await async_input('Enter a message: ')
-        msg = (await loop.run_in_executor(None, sys.stdin.readline)).rstrip()
-        await client.send_message(channelId, msg)
-
-    client.run_until_disconnected()
-
+def on_message(message):
+    print(message)
 
 if __name__ == "__main__":
-    loop.run_until_complete(main())
+    client = CLITelegram('my_listener', api_id, api_hash, on_message)
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(client.run())
