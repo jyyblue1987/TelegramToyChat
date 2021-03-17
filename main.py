@@ -1,6 +1,7 @@
 
 import asyncio
 import threading
+import sys
 
 from telethon.sync import TelegramClient, events
 
@@ -8,24 +9,21 @@ api_id = '3961096'
 api_hash = '5c814390e26776fbe56919f7bff872cc'
 channelId = 'https://t.me/testgrp_pi'
 
-@asyncio.coroutine
-def send_memssage(client):
-    while True:
-        msg = input()
-        client.send_message(channelId, msg)  # needs async, I'm stuck!
+loop = asyncio.get_event_loop()
 
-def main():
-    client = TelegramClient('my_listener', api_id, api_hash)
-    client.start()
+client = TelegramClient('my_listener', api_id, api_hash)
+client.start()
 
-    # def send_message_thread():
-    #     while True:
-    #         msg = input()
-    #         loop = asyncio.get_event_loop()
-    #         loop.run_until_complete(my_async_def())
-    #         client.send_message(channelId, msg)  # needs async, I'm stuck!
+async def async_input(prompt):
+    """
+    Python's ``input()`` is blocking, which means the event loop we set
+    above can't be running while we're blocking there. This method will
+    let the loop run while we wait for input.
+    """
+    print(prompt, end='', flush=True)
+    return (await loop.run_in_executor(None, sys.stdin.readline)).rstrip()
 
-    # threading.Thread(target=send_message_thread).start()
+async def main():
 
     print('Running Telegram Listener...')
 
@@ -34,9 +32,13 @@ def main():
         message = event.text
         print(message)
 
-    print('flow into client event loop...')
+    while True:
+        # msg = await async_input('Enter a message: ')
+        msg = (await loop.run_in_executor(None, sys.stdin.readline)).rstrip()
+        await client.send_message(channelId, msg)
+
     client.run_until_disconnected()
 
 
 if __name__ == "__main__":
-    main()
+    loop.run_until_complete(main())
